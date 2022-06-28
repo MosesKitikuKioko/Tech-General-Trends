@@ -1,0 +1,402 @@
+---
+title: "Tech Space Trends in Africa: "
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    social: ["menu"]
+    source_code: "https://github.com/MosesKitikuKioko/Tech-General-Trends/tree/main"
+    theme: united
+    
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+
+#clear working space
+rm(list = ls(all = T))
+
+#set working directory 
+setwd('E:/CcHUB Workflows/R Codes/Stackoverflow Analysis')
+
+
+
+#load packages
+pkgs<-c("tidyverse","janitor","lubridate","viridis","scales","tidyquant", "openxlsx", "splitstackshape", "plotly", "lemon", "reactablefmtr", "sf","rgdal","tmap", "grid", "BAMMtools","GISTools","classInt", 'webshot','htmlwidgets', "googlesheets4", "googledrive")
+
+#feathers
+#install missing packages 
+miss_pkgs <- pkgs[!pkgs %in% installed.packages()[,1]]
+
+if(length(miss_pkgs>0)){
+  install.packages(miss_pkgs,dependencies = T) 
+}
+
+#loading the packages
+invisible(lapply(pkgs,library,character.only=T))
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#read data from the local directory 
+data = openxlsx::read.xlsx("Data/Stackoverflow Cleaned Data.xlsx") %>% 
+  dplyr::mutate(year = as.Date(paste(year, 1, 1, sep = "-")))
+
+#read data from from shape files 
+africa = sf::st_read("Data/afr_g2014_2013_0/afr_g2014_2013_0.shp", quiet = TRUE, stringsAsFactors=FALSE) %>% 
+  sf::st_as_sf(geometry, geometry) %>% 
+  dplyr::mutate(geometry = st_geometry(geometry)) %>% 
+  dplyr::select(country = ADM0_NAME, geometry)
+
+
+
+# xx = googlesheets4::read_sheet("1Jni3gTaa449g2EAW_wjaLAdibm_wivjDbFBGD4N-_74",
+#                                sheet = "A:B",
+#                                range = "african country subdivision") %>%
+#   dplyr::select_all(str_to_lower) %>%
+#   dplyr::mutate(country = ifelse(country == "Sao Tome & Principe", "Sao Tome and Principe",
+#                                  ifelse(country == "Côte d'Ivoire", "Ivory Coast",
+#                                         ifelse(country == "Burkina Faso", "Burkina",
+#                                                ifelse(str_detect(country, "Congo"), "Democratic Republic of the Congo", country)))))
+  
+# #countries
+# country = data %>%
+#   dplyr::group_by(country) %>%
+#   dplyr::summarise(count = n()) %>%
+#   dplyr::filter(!is.na(country)) %>%
+#   dplyr::select(-count) %>%
+#   dplyr::ungroup() %>%
+#   dplyr::left_join(xx , by = "country") %>%
+#   dplyr::mutate(subregion = ifelse(country == "Swaziland", "Southern Africa",
+#                                    ifelse(country == "Cape Verde", "Western Africa", subregion))) %>%
+#   dplyr::group_by(country,region = subregion) %>%
+#   dplyr::summarise(count = n()) %>%
+#   dplyr::ungroup() %>% 
+#   dplyr::select(-count)
+# 
+# #write a csv
+# openxlsx::write.xlsx(country, "Data/country and regions.xlsx")
+
+
+# #create a google repository for the data 
+# googlesheets4::write_sheet(data, 
+#                            '14E5tPiTTNsVx5IPJVySWakgY-t3lI4yXVfr5sKPn8LY',
+#                            sheet = 'data')
+```
+
+
+
+
+
+
+
+Popular Programming, Scripting & Markup Languages  {data-navmenu="General Trends"}
+===================================== 
+
+> Javascript was the popular programming language in Africa for period of 10 years with a cumulative 8181 users , it was followed by HTML & CSS with 6978 and 6952 respectively, SQL with 6555, Java with 5101 and finally Python closes the top tier with 4291
+
+
+
+```{r echo=FALSE, fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+#prepare the languages data
+languages = data %>% 
+  dplyr::select(year, languages) %>% 
+  splitstackshape::cSplit('languages', sep = "/") %>% 
+  tidyr::pivot_longer(languages_01:languages_43, values_to = "language") %>% 
+  tidyr::drop_na() %>% 
+  dplyr::select(-name) %>% 
+  dplyr::filter(str_detect(language,"Other", negate = T)) %>% 
+  dplyr::group_by(language) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::mutate(percent = count/sum(count)) %>% 
+  dplyr::arrange_at('count', desc) %>% 
+  dplyr::top_n(30) 
+
+#plot the graph 
+languages_plot = plotly::plot_ly(data = languages, 
+                                 y = ~language, x = ~count, type = "bar",orientation = 'h',
+                                 label = ~percent,
+                                 marker = list(color = '#2C5F2DFF',
+                                               size = ~percent, sizemode = 'area', 
+                                               line = list(color = '#2C5F2DFF', width = 1)),
+                                 hovertemplate =  paste("<b>%{yaxis.title.text}  %{y}<br></b><br>",
+                                                        "Count:  %{x}<br>",
+                                                        "<br><extra></extra>"))
+
+
+#add layout 
+languages_plot = languages_plot %>% plotly::layout(title = "",
+                                                   yaxis = list(title = "",
+                                                                categoryorder = "total ascending"),
+                                                   xaxis = list(title = ""))
+
+
+
+#display the graph 
+languages_plot
+```
+
+
+Popular Databases  {data-navmenu="General Trends"}
+===================================== 
+
+> The top 5 databases used were MySQL with a cumulative 6428 users , followed by SQLite with 3264 users, PostgreSQL with 2827, MangoDB 2669 and finally Microsoft SQL Server closed out with 2236 users.
+
+```{r echo=FALSE, fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+#remove objects in other codes 
+rm(languages, languages_plot)
+
+#prepare the languages data
+databases = data %>% 
+  dplyr::select(year, databases) %>% 
+  splitstackshape::cSplit('databases', sep = "/") %>% 
+  tidyr::pivot_longer(databases_01:databases_22, values_to = "database") %>% 
+  tidyr::drop_na() %>% 
+  dplyr::select(-name) %>% 
+  dplyr::filter(str_detect(database,"Other", negate = T)) %>% 
+  dplyr::group_by(database) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::mutate(percent = count/sum(count)) %>% 
+  dplyr::arrange_at('count', desc) 
+
+
+#plot the graph 
+database_plot = plotly::plot_ly(data = databases, 
+                                 y = ~database, x = ~count, type = "bar",orientation = 'h',
+                                 label = ~percent,
+                                 marker = list(color = '#755139FF',
+                                                line = list(color = '#755139FF', width = 1)),
+                                 hovertemplate =  paste("<b>%{yaxis.title.text}  %{y}<br></b><br>",
+                                                        "Count:  %{x}<br>","<br><extra></extra>"))
+
+#add layout 
+database_plot = database_plot %>% plotly::layout(title = "",
+                                                   yaxis = list(title = "",
+                                                                categoryorder = "total ascending"),
+                                                   xaxis = list(title = ""))
+
+
+
+#display the graph 
+database_plot
+```
+
+
+Popular WebFrames  {data-navmenu="General Trends"}
+===================================== 
+
+> jQuery was the most commonly used web framework in Africa continent with cumulative 2431 users, closely followed by Angular with 2248 users , React.js with 2222, Express and Django closing out the top tier with 1556 and 1504 respectively. 
+
+```{r echo=FALSE, fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+#remove objects in other codes 
+rm(databases, database_plot)
+
+#prepare the languages data
+frameworks = data %>% 
+  dplyr::select(year, frameworks) %>% 
+  splitstackshape::cSplit('frameworks', sep = "/") %>% 
+  tidyr::pivot_longer(frameworks_01:frameworks_18, values_to = "framework") %>% 
+  tidyr::drop_na() %>% 
+  dplyr::select(-name) %>% 
+  dplyr::filter(str_detect(framework,"Other", negate = T)) %>% 
+  dplyr::group_by(framework) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::mutate(percent = count/sum(count)) %>% 
+  dplyr::arrange_at('count', desc) 
+
+
+#plot the graph 
+framework_plot = plotly::plot_ly(data = frameworks, 
+                                 y = ~framework, x = ~count, type = "bar",orientation = 'h',
+                                 label = ~percent,
+                                 marker = list(color = '#603F83FF',
+                                                line = list(color = '#603F83FF', width = 1)),
+                                 hovertemplate =  paste("<b>%{yaxis.title.text}  %{y}<br></b><br>",
+                                                        "Count:  %{x}<br>","<br><extra></extra>"))
+
+#add layout 
+framework_plot = framework_plot %>% plotly::layout(title = "",
+                                                   yaxis = list(title = "",
+                                                                categoryorder = "total ascending"),
+                                                   xaxis = list(title = " "))
+
+
+
+#display the graph 
+framework_plot
+```
+
+
+Popular Operating Systems  {data-navmenu="General Trends"}
+===================================== 
+
+> Windows Operating System was used by more than half  of the cumulative number of participants in the 10 year period accounting to 52.12% . The other popular operating systems were Linux and MacOS with 21.65% and 13.68% respectively. 
+
+```{r fig.height=8, fig.width=12, message=FALSE, warning=FALSE}
+#clear objects in chucks of code in previous 
+rm(framework_plot, frameworks)
+
+#clean operating system plots 
+os = data %>% 
+  dplyr::select(year, operating_system) %>% 
+  dplyr::mutate(operating_system  = ifelse(operating_system == "Other Linux" | operating_system == "Linux-based", "Linux", 
+                                           ifelse(str_detect(operating_system, "Technical"), "Windows & Ubuntu", operating_system))) %>% 
+  dplyr::filter(str_detect(operating_system, "Other", negate = T)) %>% 
+  tidyr::drop_na() %>% 
+  dplyr::group_by(operating_system) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::mutate(percent = count/sum(count)*100) %>% 
+  dplyr::arrange_at('count', desc)%>%
+  dplyr::ungroup()
+
+
+#plot the graph 
+os_plot = plotly::plot_ly(data = os, 
+                          y = ~operating_system, x = ~count, type = "bar",orientation = 'h',
+                          label = ~percent,
+                          marker = list(color = '#0063B2FF',
+                                        line = list(color = '#0063B2FF', width = 1)),
+                          hovertemplate =  paste("<b>%{yaxis.title.text}  %{y}</b><br>",
+                                                 "Count:  %{x}<br>","<br><extra></extra>"))
+
+#add layout 
+os_plot = os_plot %>% plotly::layout(title = "",
+                                     yaxis = list(title = "",
+                                                  categoryorder = "total ascending"),
+                                     xaxis = list(title = " "))
+
+
+#display the plot
+os_plot
+  
+```
+
+
+Age Group Trends per Year {data-navmenu="User Demographics"}
+=============================================
+
+> The largest proportion of individuals in the technology industry were between the ages of 24 and 34, followed by those aged 18 to 24 and those aged 34 to 44
+
+```{r}
+#remove objects from previous codes 
+rm(os, os_plot)
+
+#prepare age data 
+age = data %>% 
+  dplyr::select(year, age_group_cal) %>% 
+  tidyr::drop_na() %>% 
+  dplyr::mutate(year = lubridate::year(year)) %>% 
+  dplyr::group_by(year, age_group = age_group_cal) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::filter(str_detect(age_group, "Prefer", negate = T)) %>% 
+  tidyr::pivot_wider(id_cols = year, names_from = age_group, values_from = count)
+
+#plot the age data 
+age_plot = plotly::plot_ly(data = age, x = ~year, y = ~ `18-24 years old`,type = "scatter", mode = "line", name = "18-24 years",
+                           text = "18-24 years old",
+                           hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+age_plot = age_plot %>% plotly::add_trace(y = ~`Under 18 years old`, name = "Under 18 yrs", mode = "line",
+                                          text = "Under 18 years old",
+                                          hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+age_plot = age_plot %>% plotly::add_trace(y = ~`25-34 years old`, name = "25-34 years", mode = "line",
+                                          text = "25-34 years old",
+                                          hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+age_plot = age_plot %>% plotly::add_trace(y = ~`35-44 years old`, name = "35-44 years", mode = "line",
+                                          text = "35-44 years old",
+                                          hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+age_plot = age_plot %>% plotly::add_trace(y = ~`45-54 years old`, name = "45-54 years", mode = "line",
+                                          text = "45-54 years old",
+                                          hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>%Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+age_plot = age_plot %>% plotly::add_trace(y = ~`65 years or older`, name = "65 years or older", mode = "line",
+                                          text = "65 years or older",
+                                          hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b> Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+
+#change the layout of the plot 
+age_plot = age_plot %>% layout(title = '', 
+                               yaxis = list(title = ''), 
+                               xaxis = list(title = ""),
+                               legend = list(orientation = "h",   # show entries horizontally
+                                             xanchor = "center",  # use center of legend as anchor
+                                             x = 0.5),
+                               barmode = 'group')
+
+age_plot
+
+```
+
+
+Gender Groups Trends Per Year {data-navmenu="User Demographics"}
+=================================================
+
+> Both genders (Males and Females) exhibited an upward trend in technology use on the continent, with Males dominating the sector
+
+
+```{r}
+#remove objects from previous code 
+rm(age, age_plot)
+
+#prepare gender data
+gender = data %>% 
+  dplyr::filter(str_detect(gender_cal, "Prefer", negate = T) & !is.na(gender_cal)) %>% 
+  dplyr::select(year, gender_cal) %>% 
+  dplyr::mutate(year = lubridate::year(year)) %>% 
+  dplyr::group_by(year, gender = gender_cal) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::ungroup() %>% 
+  tidyr::pivot_wider(id_cols = year, names_from = gender, values_from = count)
+
+#plot the data 
+gender_plot = plotly::plot_ly(data = gender, x = ~year, y = ~Male, type = "scatter", mode ="line", name = "Male",
+                              text = "Male", 
+                              hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+gender_plot = gender_plot %>% plotly::add_trace(y = ~Female, mode = "line", name = "Female",text = "Female", 
+                              hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b>Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+gender_plot = gender_plot %>% plotly::add_trace(y = ~Other, mode = "line", name = "Other",text = "Others", 
+                              hovertemplate =  paste("<b>%{text}</b><br><br>",
+                                                  "Year:  %{x}<br>",
+                                                  "<b> Count: %{y}<br>", 
+                                                  "<br><extra></extra>"))
+
+#change the layout of the plot 
+gender_plot = gender_plot %>% layout(title = '', 
+                               yaxis = list(title = ''), 
+                               xaxis = list(title = ""),
+                               legend = list(orientation = "h",   # show entries horizontally
+                                             xanchor = "center",  # use center of legend as anchor
+                                             x = 0.5),
+                               barmode = 'group')
+
+#display the plot 
+gender_plot
+
+```
+
